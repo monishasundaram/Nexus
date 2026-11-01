@@ -1,6 +1,8 @@
 import json
 from datetime import datetime
 from typing import Annotated, Literal
+from .config import MAX_EVENTS, MAX_TIME
+from .engine.events import check_event_shape
 
 from pydantic import (AfterValidator, BaseModel, ConfigDict, Field,
                       StringConstraints, model_validator)
@@ -147,4 +149,77 @@ class ValidationReport(BaseModel):
     error_count: int
     warning_count: int
     issues: list[ValidationIssue]
+    stats: dict
+
+# ---------- scenarios ----------
+EventType = Literal["failure", "capacity_reduction", "road_closure",
+                    "resource_shortage", "maintenance", "recovery"]
+Hours = Annotated[float, Field(ge=0, le=MAX_TIME)]
+PositiveHours = Annotated[float, Field(gt=0, le=MAX_TIME)]
+ShortText = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=500)]
+
+
+class EventIn(BaseModel):
+    event_type: EventType
+    target_node_id: int
+    params: dict = Field(default_factory=dict)
+    start_time: Hours = 0
+    duration: PositiveHours | None = None
+
+    @model_validator(mode="after")
+    def check_shape(self):
+        problems = check_event_shape(self.event_type, self.params, self.duration)
+        if problems:
+            raise ValueError(" ".join(problems))
+        return self
+
+
+class EventOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    event_type: str
+    target_node_id: int | None
+    params: dict
+    start_time: float
+    duration: float | None
+
+
+class ScenarioIn(BaseModel):
+    name: Name
+    description: Text = ""
+    assumptions: list[ShortText] = Field(default_factory=list, max_length=20)
+    events: list[EventIn] = Field(default_factory=list, max_length=MAX_EVENTS)
+
+
+class ScenarioOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    environment_id: int
+    parent_id: int | None
+    name: str
+    version: int
+    description: str
+    status: str
+    is_archived: bool
+    assumptions: list[str]
+    created_at: datetime
+    updated_at: datetime
+    events: list[EventOut] = Field(default_factory=list)
+    simulation_count: int = 0
+    environment_name: str = ""
+
+
+class ScenarioIssue(BaseModel):
+    level: Literal["error", "warning", "info"]
+    code: str
+    message: str
+    node_ids: list[int]
+    event_ids: list[int]
+
+
+class ScenarioValidationReport(BaseModel):
+    valid: bool
+    error_count: int
+    warning_count: int
+    issues: list[ScenarioIssue]
     stats: dict

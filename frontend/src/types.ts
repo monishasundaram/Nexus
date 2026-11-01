@@ -69,3 +69,59 @@ export interface ValidationReport {
   issues: ValidationIssue[]
   stats: { node_count: number; edge_count: number; categories: Record<string, number>; has_cycles: boolean }
 }
+
+export type EventType =
+  | 'failure' | 'capacity_reduction' | 'road_closure'
+  | 'resource_shortage' | 'maintenance' | 'recovery'
+
+export interface EventTypeInfo {
+  type: EventType
+  label: string
+  description: string
+  param: string | null
+  param_label: string | null
+  duration: 'optional' | 'required' | 'forbidden'
+  targets: Category[] | null
+}
+
+export interface ScenarioEvent {
+  id: number
+  event_type: EventType
+  target_node_id: number | null
+  params: Record<string, number>
+  start_time: number
+  duration: number | null
+}
+
+export interface Scenario {
+  id: number
+  environment_id: number
+  parent_id: number | null
+  name: string
+  version: number
+  description: string
+  status: 'draft' | 'final'
+  is_archived: boolean
+  assumptions: string[]
+  created_at: string
+  updated_at: string
+  events: ScenarioEvent[]
+  simulation_count: number
+  environment_name: string
+}
+
+export interface ScenarioIssue {
+  level: 'error' | 'warning' | 'info'
+  code: string
+  message: string
+  node_ids: number[]
+  event_ids: number[]
+}
+
+export interface ScenarioValidationReport {
+  valid: boolean
+  error_count: number
+  warning_count: number
+  issues: ScenarioIssue[]
+  stats: Record<string, unknown>
+}

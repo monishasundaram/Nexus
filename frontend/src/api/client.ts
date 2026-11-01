@@ -42,6 +42,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 export const api = <T>(path: string) => request<T>('GET', path)
 export const post = <T>(path: string, body?: unknown) => request<T>('POST', path, body)
 export const patch = <T>(path: string, body: unknown) => request<T>('PATCH', path, body)
+export const put = <T>(path: string, body: unknown) => request<T>('PUT', path, body)
 export const del = (path: string) => request<void>('DELETE', path)
 
 // The server stores UTC but sends timestamps without a "Z"
