@@ -24,7 +24,7 @@ CAMPUS_NODES = [
     # Water
     _n("Municipal Water Supply", "water", 0, 340, 500, 0, 1.0, "kL/day", desc="External water main."),
     _n("Water Pump House", "water", 520, 260, 500, 0, 0.8, "kL/day", demands={"electricity": 60}, desc="Electric pumps lifting water to the tank."),
-    _n("Overhead Water Tank", "water", 780, 260, 200, 0, 0.7, "kL/day", desc="Storage and gravity distribution."),
+    _n("Overhead Water Tank", "water", 780, 260, 400, 0, 0.7, "kL/day", desc="Storage and gravity distribution."),
     # Drainage
     _n("Drainage Network", "drainage", 520, 400, 300, 0, 0.6, "kL/day", demands={"electricity": 20}, desc="Storm and waste water drainage."),
     # Communication
