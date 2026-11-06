@@ -58,8 +58,7 @@ impact-hours (score x duration summed until the last event change).
 ## 9. Worked example: primary grid failure on NEXUS Campus
 - Primary Grid Supply output 0. Main Substation inflow = 0 + 400 kW (diesel) x 0.8 = 320 kW, capacity 1000, so a = 0.32.
 - Demand on the substation: 60 + 30 + 20 + 680 = 790 kW. Service level = 320 / 790 = 40.5%.
-- Every required consumer of the substation gets 40.5%. Pump House output falls with it, so the tank
-  receives 202.5 kL/day against 330 requested.
+- Every required consumer of the substation gets 40.5%. Pump House output falls with it, so the tank receives about 202.5 kL/day against 330 requested.
 
 ## 10. Limits
 See `LIMITATIONS` in `engine/rules.py`. Importance weights and strengths are assumptions; test them with the
