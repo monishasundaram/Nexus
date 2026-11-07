@@ -36,7 +36,7 @@ export default function TimelineTab({ timeline, events, peakTime }: {
       )}
 
       <div className="overflow-x-auto rounded-xl border border-white/10">
-        <table className="w-full min-w-[600px] text-left text-sm">
+        <table className="w-full min-w-150 text-left text-sm">
           <thead className="bg-surface text-xs uppercase tracking-wide text-slate-400">
             <tr>
               <th className="px-3 py-2">Time</th><th className="px-3 py-2">Score</th><th className="px-3 py-2">Affected</th>

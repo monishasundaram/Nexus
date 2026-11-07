@@ -48,7 +48,7 @@ export default function NodeTable({ rows, selected, onSelect }: Props) {
       </div>
 
       <div className="overflow-x-auto rounded-xl border border-white/10">
-        <table className="w-full min-w-[640px] text-left text-sm">
+        <table className="w-full min-w-160 text-left text-sm">
           <thead className="bg-surface text-xs uppercase tracking-wide text-slate-400">
             <tr>
               <th className="px-3 py-2">Node</th><th className="px-3 py-2">Category</th>

@@ -3,8 +3,9 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { api, post, put } from '../api/client'
 import Field from '../components/Field'
 import ScenarioValidationPanel from '../components/ScenarioValidationPanel'
-import { btn, btnDanger, btnPrimary, inputClass } from '../components/formStyles'
+import { btn, btnPrimary, inputClass } from '../components/formStyles'
 import { newDraft, toDrafts, toPayload, type Draft } from '../scenarios/draft'
+import RunPanel from '../components/RunPanel'
 import type {
   Category, EnvironmentDetail, EventType, EventTypeInfo, NexusNode,
   Scenario, ScenarioIssue, ScenarioValidationReport,
@@ -277,6 +278,7 @@ function Editor({ id }: { id: number }) {
 
         <aside className="space-y-3">
           {report && <ScenarioValidationPanel report={report} onSelect={focusIssue} />}
+                    <RunPanel scenarioId={id} status={scenario.status} />
           <section className="rounded-xl border border-white/10 bg-card p-3 text-xs text-slate-400">
             <h2 className="mb-1 text-sm font-medium text-slate-200">How events work</h2>
             <ul className="list-disc space-y-1 pl-4">

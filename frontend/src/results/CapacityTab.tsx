@@ -11,7 +11,7 @@ export default function CapacityTab({ rows }: { rows: CapacityRow[] }) {
   return (
     <div className="space-y-2">
       <div className="overflow-x-auto rounded-xl border border-white/10">
-        <table className="w-full min-w-[760px] text-left text-sm">
+        <table className="w-full min-w-190 text-left text-sm">
           <thead className="bg-surface text-xs uppercase tracking-wide text-slate-400">
             <tr>
               <th className="px-3 py-2">Resource node</th><th className="px-3 py-2">Unit</th>
