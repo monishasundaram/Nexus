@@ -134,3 +134,33 @@ def test_deleting_a_scenario_also_removes_its_simulations(client):
     assert client.delete(f"/api/scenarios/{s['id']}").status_code == 409
     assert client.delete(f"/api/scenarios/{s['id']}?force=true").status_code == 204
     assert client.get(f"/api/simulations/{sim['id']}").status_code == 404
+
+
+
+def test_the_snapshot_stores_node_positions_for_the_results_graph(client):
+    env, sc = campus(client)
+    sim = run(client, sc["Primary electricity supply failure"])
+    snap = client.get(f"/api/simulations/{sim['id']}/snapshot").json()
+    assert snap["environment"]["is_demo"] is True
+    live = {n["name"]: n for n in client.get(f"/api/environments/{env['id']}").json()["nodes"]}
+    for n in snap["nodes"]:
+        assert (n["pos_x"], n["pos_y"]) == (live[n["name"]]["pos_x"], live[n["name"]]["pos_y"])
+
+
+def test_dashboard_shows_real_results(client):
+    _, sc = campus(client)
+    empty = client.get("/api/dashboard").json()
+    assert empty["recent_simulations"] == [] and empty["most_affected_nodes"] == []
+    run(client, sc["Primary electricity supply failure"])
+    run(client, sc["Water supply capacity reduced by 50%"])
+    d = client.get("/api/dashboard").json()
+    assert d["completed_simulations"] == 2 and d["runs_counted"] == 2
+    latest = d["recent_simulations"][0]
+    assert latest["scenario_name"] == "Water supply capacity reduced by 50%"
+    assert latest["affected_nodes"] == 11 and 0.13 < latest["impact_score"] < 0.14
+    top = d["most_affected_nodes"]
+    # ten nodes are hit by both scenarios; ties are listed alphabetically and the list is capped at 8
+    assert len(top) == 8 and all(n["count"] == 2 for n in top)
+    assert [n["name"] for n in top] == sorted(n["name"] for n in top)
+    assert top[0]["name"] == "Administration Building" and top[0]["category"] == "building"
+    assert not {"Central Avenue", "Main Substation"} & {n["name"] for n in top}

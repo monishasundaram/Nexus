@@ -56,7 +56,17 @@ export interface DashboardData {
   environments: number
   scenarios: number
   completed_simulations: number
-  recent_simulations: { id: number; scenario_id: number; status: string; started_at: string }[]
+  recent_simulations: {
+    id: number
+    scenario_id: number
+    scenario_name: string
+    scenario_version: number
+    status: string
+    started_at: string
+    impact_score: number | null
+    affected_nodes: number | null
+  }[]
   category_distribution: { category: string; count: number }[]
-  most_affected_nodes: { name: string; count: number }[]
+  most_affected_nodes: { name: string; category: string; count: number }[]
+  runs_counted: number
 }

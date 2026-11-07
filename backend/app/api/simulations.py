@@ -25,11 +25,13 @@ def _snapshot(db: Session, scenario) -> dict:
     events = db.scalars(select(ScenarioEvent).where(ScenarioEvent.scenario_id == scenario.id)
                         .order_by(ScenarioEvent.start_time, ScenarioEvent.id)).all()
     return {
-        "environment": {"id": env.id, "name": env.name, "model_version": env.model_version},
+                "environment": {"id": env.id, "name": env.name, "model_version": env.model_version,
+                        "is_demo": env.is_demo},
         "scenario": {"id": scenario.id, "name": scenario.name, "version": scenario.version,
                      "description": scenario.description, "assumptions": list(scenario.assumptions or [])},
-        "nodes": [{"id": n.id, "name": n.name, "category": n.category, "state": n.state,
+                "nodes": [{"id": n.id, "name": n.name, "category": n.category, "state": n.state,
                    "capacity": n.capacity, "demand": n.demand, "importance": n.importance,
+                   "pos_x": n.pos_x, "pos_y": n.pos_y,
                    "meta": copy.deepcopy(n.meta or {})} for n in nodes],
         "edges": [{"id": e.id, "source_id": e.source_id, "destination_id": e.destination_id,
                    "relationship_type": e.relationship_type, "strength": e.strength,
