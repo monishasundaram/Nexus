@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from .api import dashboard, environments, graph, health, scenarios, simulations
+from .api import comparisons, dashboard, environments, graph, health, scenarios, simulations
 
 app = FastAPI(title="NEXUS API", version="0.1.0")
 
@@ -16,6 +16,7 @@ app.include_router(environments.router, prefix="/api", tags=["environments"])
 app.include_router(graph.router, prefix="/api", tags=["graph"])
 app.include_router(scenarios.router, prefix="/api", tags=["scenarios"])
 app.include_router(simulations.router, prefix="/api", tags=["simulations"])
+app.include_router(comparisons.router, prefix="/api", tags=["comparisons"])
 
 @app.get("/", include_in_schema=False)
 def root():

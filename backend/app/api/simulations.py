@@ -6,6 +6,8 @@ from sqlalchemy.orm import Session
 
 from ..config import MODEL_VERSION
 from ..database import get_db
+from ..engine.modifications import (ModificationError, apply_modifications, describe_modifications,
+                                    fingerprint)
 from ..engine.propagation import SimulationLimitError
 from ..engine.simulate import SimulationInputError, run_simulation
 from ..models import Edge, Environment, Node, ScenarioEvent, Simulation, SimulationResult, utcnow
@@ -40,6 +42,17 @@ def _snapshot(db: Session, scenario) -> dict:
                     "params": dict(e.params or {}), "start_time": e.start_time, "duration": e.duration}
                    for e in events],
     }
+
+def _apply_intervention(snap: dict, mods: list[dict]) -> None:
+    """Freezes the original graph's fingerprint and, if the scenario has modifications, swaps in the modified copy."""
+    snap["base_hash"] = fingerprint(snap["nodes"], snap["edges"])
+    if not mods:
+        return
+    base_nodes, base_edges = snap["nodes"], snap["edges"]
+    snap["nodes"], snap["edges"] = apply_modifications(base_nodes, base_edges, mods)
+    snap["base_nodes"], snap["base_edges"] = base_nodes, base_edges
+    snap["modifications"] = copy.deepcopy(mods)
+    snap["modification_labels"] = describe_modifications(mods, base_nodes, base_edges)
 
 
 def _head(sim: Simulation) -> dict:
@@ -94,9 +107,12 @@ def run_scenario(sid: int, db: Session = Depends(get_db)):
                                  "so the simulation stays tied to an exact version.")
     snap = _snapshot(db, scenario)
     started = utcnow()
+    snap = _snapshot(db, scenario)
+    started = utcnow()
     try:
+        _apply_intervention(snap, scenario.modifications or [])
         result = run_simulation(snap["nodes"], snap["edges"], snap["events"])
-    except SimulationInputError as exc:
+    except ModificationError as exc:
         raise HTTPException(422, f"The scenario cannot be simulated: {exc}")
     except SimulationLimitError as exc:
         _record_failure(db, scenario, snap, str(exc))

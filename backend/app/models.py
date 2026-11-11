@@ -80,6 +80,7 @@ class Scenario(Stamps, Base):
     status: Mapped[str] = mapped_column(String(20), default="draft")
     is_archived: Mapped[bool] = mapped_column(Boolean, default=False)
     assumptions: Mapped[list] = mapped_column(JSON, default=list)
+    modifications: Mapped[list | None] = mapped_column(JSON, nullable=True, default=list)
 
 class ScenarioEvent(Base):
     __tablename__ = "scenario_events"
@@ -128,4 +129,10 @@ class AIExplanation(Base):
     question: Mapped[str] = mapped_column(Text)
     answer: Mapped[str] = mapped_column(Text)
     source_refs: Mapped[list] = mapped_column(JSON, default=list)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+class Comparison(Base):
+    __tablename__ = "comparisons"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    simulation_ids: Mapped[list] = mapped_column(JSON)  # ordered; the first is the reference
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

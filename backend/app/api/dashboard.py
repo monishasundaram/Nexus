@@ -5,7 +5,8 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..models import Environment, Node, Scenario, Simulation, SimulationResult
+from ..models import Comparison, Environment, Node, Scenario, Simulation, SimulationResult
+from .comparisons import comparison_summary
 
 router = APIRouter()
 
@@ -56,4 +57,6 @@ def dashboard(db: Session = Depends(get_db)):
         "category_distribution": [{"category": c, "count": n} for c, n in cats],
         "most_affected_nodes": [{"name": n, "category": categories[n], "count": c} for n, c in top],
         "runs_counted": len(done),
+        "recent_comparisons": [comparison_summary(db, c) for c in db.scalars(
+            select(Comparison).order_by(Comparison.created_at.desc(), Comparison.id.desc()).limit(RECENT))],
     }

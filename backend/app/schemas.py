@@ -1,11 +1,12 @@
 import json
 from datetime import datetime
-from typing import Annotated, Literal
-from .config import MAX_EVENTS, MAX_TIME
 from .engine.events import check_event_shape
+from typing import Annotated, Literal, Union
 
-from pydantic import (AfterValidator, BaseModel, ConfigDict, Field,
+from pydantic import (AfterValidator, BaseModel, BeforeValidator, ConfigDict, Field,
                       StringConstraints, model_validator)
+
+from .config import MAX_EVENTS, MAX_MODIFICATIONS, MAX_TIME
 
 Category = Literal["building", "road", "electricity", "water", "drainage",
                    "transport", "communication", "generic"]
@@ -207,6 +208,8 @@ class ScenarioOut(BaseModel):
     events: list[EventOut] = Field(default_factory=list)
     simulation_count: int = 0
     environment_name: str = ""
+    modifications: Annotated[list[dict], BeforeValidator(lambda v: v or [])] = Field(default_factory=list)
+    modification_labels: list[str] = Field(default_factory=list)
 
 
 class ScenarioIssue(BaseModel):
@@ -223,3 +226,65 @@ class ScenarioValidationReport(BaseModel):
     warning_count: int
     issues: list[ScenarioIssue]
     stats: dict
+
+
+
+# ---------- intervention modifications ----------
+class _Mod(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+
+class SetCapacityMod(_Mod):
+    type: Literal["set_capacity"]
+    node_id: int
+    capacity: Amount
+
+
+class ReduceDemandMod(_Mod):
+    type: Literal["reduce_demand"]
+    node_id: int
+    reduce_pct: Annotated[float, Field(gt=0, le=100)]
+
+
+class AddNodeMod(_Mod):
+    type: Literal["add_node"]
+    key: Annotated[str, StringConstraints(pattern=r"^[A-Za-z0-9_-]{1,40}$")]
+    name: Name
+    category: Category
+    capacity: Amount = 0
+    importance: Unit = 0.5
+    unit: Annotated[str, StringConstraints(strip_whitespace=True, max_length=20)] = ""
+
+
+class AddEdgeMod(_Mod):
+    type: Literal["add_edge"]
+    source: int | str
+    destination: int | str
+    relationship_type: Relationship = "required"
+    strength: Unit = 1.0
+
+
+class SetEdgeMod(_Mod):
+    type: Literal["set_edge"]
+    edge_id: int
+    strength: Unit | None = None
+    relationship_type: Relationship | None = None
+
+    @model_validator(mode="after")
+    def something_changes(self):
+        if self.strength is None and self.relationship_type is None:
+            raise ValueError("Give a new strength, a new type, or both")
+        return self
+
+
+Modification = Annotated[
+    Union[SetCapacityMod, ReduceDemandMod, AddNodeMod, AddEdgeMod, SetEdgeMod], Field(discriminator="type")]
+
+
+class ModificationsIn(BaseModel):
+    modifications: list[Modification] = Field(default_factory=list, max_length=MAX_MODIFICATIONS)
+
+
+# ---------- comparisons ----------
+class ComparisonIn(BaseModel):
+    simulation_ids: list[int] = Field(min_length=2, max_length=6)

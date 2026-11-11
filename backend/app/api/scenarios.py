@@ -8,9 +8,11 @@ from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..engine.events import EVENT_TYPES
+from ..engine.modifications import check_modifications, describe_modifications
 from ..engine.scenario_validation import validate_scenario
-from ..models import Environment, Node, Scenario, ScenarioEvent, Simulation
-from ..schemas import EventIn, EventOut, ScenarioIn, ScenarioOut, ScenarioValidationReport
+from ..models import Edge, Environment, Node, Scenario, ScenarioEvent, Simulation
+from ..schemas import (EventIn, EventOut, ModificationsIn, ScenarioIn, ScenarioOut,
+                       ScenarioValidationReport)
 from ..seed.scenarios import SAMPLE_SCENARIOS
 from .common import commit, get_env_or_404, touch
 
@@ -44,14 +46,29 @@ def _present(db: Session, scenarios: list[Scenario]) -> list[ScenarioOut]:
             .group_by(Simulation.scenario_id))}
         env_ids = list({s.environment_id for s in scenarios})
         names = {e.id: e.name for e in db.scalars(select(Environment).where(Environment.id.in_(env_ids)))}
-    out = []
+        out = []
+    graphs: dict[int, tuple[list[dict], list[dict]]] = {}
     for s in scenarios:
         o = ScenarioOut.model_validate(s)
         o.events = events.get(s.id, [])
         o.simulation_count = sims.get(s.id, 0)
         o.environment_name = names.get(s.environment_id, "")
+        if s.modifications:
+            if s.environment_id not in graphs:
+                graphs[s.environment_id] = _graph_dicts(db, s.environment_id)
+            o.modification_labels = describe_modifications(s.modifications, *graphs[s.environment_id])
         out.append(o)
     return out
+
+
+def _graph_dicts(db: Session, env_id: int) -> tuple[list[dict], list[dict]]:
+    nodes = db.scalars(select(Node).where(Node.environment_id == env_id).order_by(Node.id)).all()
+    edges = db.scalars(select(Edge).where(Edge.environment_id == env_id).order_by(Edge.id)).all()
+    return (
+        [{"id": n.id, "name": n.name, "category": n.category, "state": n.state, "capacity": n.capacity,
+          "demand": n.demand, "importance": n.importance, "meta": n.meta or {}} for n in nodes],
+        [{"id": e.id, "source_id": e.source_id, "destination_id": e.destination_id,
+          "relationship_type": e.relationship_type, "strength": e.strength, "capacity": e.capacity} for e in edges])
 
 
 def _ensure_name_free(db: Session, env_id: int, name: str, exclude_id: int | None = None):
@@ -87,12 +104,21 @@ def _clone_events(db: Session, src_id: int, dst_id: int):
 
 def _validate(db: Session, s: Scenario) -> dict:
     nodes = db.scalars(select(Node).where(Node.environment_id == s.environment_id)).all()
-    return validate_scenario(
+    report = validate_scenario(
         [{"id": n.id, "name": n.name, "category": n.category, "state": n.state,
           "capacity": n.capacity} for n in nodes],
         [{"id": e.id, "event_type": e.event_type, "target_node_id": e.target_node_id,
           "params": e.params or {}, "start_time": e.start_time, "duration": e.duration}
          for e in _events_of(db, s.id)])
+    if s.modifications:
+        issues = check_modifications(*_graph_dicts(db, s.environment_id), s.modifications)
+        rank = {"error": 0, "warning": 1, "info": 2}
+        report["issues"] = sorted(report["issues"] + issues, key=lambda i: rank[i["level"]])
+        report["error_count"] = sum(i["level"] == "error" for i in report["issues"])
+        report["warning_count"] = sum(i["level"] == "warning" for i in report["issues"])
+        report["valid"] = report["error_count"] == 0
+        report["stats"]["modification_count"] = len(s.modifications)
+    return report
 
 
 def _free_copy_name(db: Session, env_id: int, base: str) -> str:
@@ -177,6 +203,23 @@ def update_scenario(sid: int, body: ScenarioIn, db: Session = Depends(get_db)):
 
 
 # ---------- validation and lifecycle ----------
+
+@router.put("/scenarios/{sid}/modifications", response_model=ScenarioOut)
+def set_modifications(sid: int, body: ModificationsIn, db: Session = Depends(get_db)):
+    s = get_scenario_or_404(db, sid)
+    if s.status != "draft":
+        raise HTTPException(409, "This version is final and cannot be edited. Create a new version instead.")
+    mods = [m.model_dump(exclude_none=True) for m in body.modifications]
+    errors = [i["message"] for i in check_modifications(*_graph_dicts(db, s.environment_id), mods)
+              if i["level"] == "error"]
+    if errors:
+        raise HTTPException(422, errors[0])
+    s.modifications = mods
+    touch(s)
+    commit(db)
+    db.refresh(s)
+    return _present(db, [s])[0]
+
 @router.post("/scenarios/{sid}/validate", response_model=ScenarioValidationReport)
 def validate_saved_scenario(sid: int, db: Session = Depends(get_db)):
     return _validate(db, get_scenario_or_404(db, sid))
@@ -204,7 +247,8 @@ def new_version(sid: int, db: Session = Depends(get_db)):
         Scenario.environment_id == src.environment_id, Scenario.name == src.name)) or src.version
     new = Scenario(environment_id=src.environment_id, parent_id=src.id, name=src.name,
                    version=latest + 1, description=src.description,
-                   assumptions=copy.deepcopy(src.assumptions), status="draft")
+                   assumptions=copy.deepcopy(src.assumptions),
+                   modifications=copy.deepcopy(src.modifications or []), status="draft")
     db.add(new)
     db.flush()
     _clone_events(db, src.id, new.id)
@@ -219,7 +263,7 @@ def duplicate_scenario(sid: int, db: Session = Depends(get_db)):
     dup = Scenario(environment_id=src.environment_id,
                    name=_free_copy_name(db, src.environment_id, src.name), version=1,
                    description=src.description, assumptions=copy.deepcopy(src.assumptions),
-                   status="draft")
+                   modifications=copy.deepcopy(src.modifications or []), status="draft")
     db.add(dup)
     db.flush()
     _clone_events(db, src.id, dup.id)
